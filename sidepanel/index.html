@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Littlebrain Chat</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Header: status dot, session controls, model setup, settings -->
+    <header class="topbar">
+      <span id="status-dot" class="dot dot-error" title="Disconnected"></span>
+      <span id="status-text" class="status-text">Not configured</span>
+      <select id="session-picker" disabled aria-label="Session">
+        <option value="">…</option>
+      </select>
+      <button id="new-btn" class="icon-btn" title="New session">＋</button>
+      <button id="delete-btn" class="icon-btn" title="Delete session" disabled>🗑</button>
+      <button id="export-btn" class="icon-btn" title="Export this session as Markdown (opens Save As)" disabled>📤</button>
+      <button id="compact-btn" class="icon-btn" title="Compress session — summarize older messages (last 10 kept verbatim)" disabled>🗜</button>
+      <button id="model-setup-btn" class="icon-btn" title="Model setup">🔧</button>
+      <button id="settings-btn" class="icon-btn" title="Settings">⚙</button>
+    </header>
+
+    <!-- Message list -->
+    <main id="messages" class="messages" aria-live="polite"></main>
+
+    <!-- Composer -->
+    <footer class="composer">
+      <!-- Context readout (P4-X3, D-P4-9): endpoint left, usage right.
+           Usage = real Ollama counters after the first round-trip, labelled
+           estimate until then; denominator only when the limit is known. -->
+      <div id="ctx-strip" class="ctx-strip">
+        <span id="ctx-endpoint" class="ctx-endpoint">not connected</span>
+        <span id="ctx-usage" class="ctx-usage"></span>
+      </div>
+      <textarea
+        id="input"
+        rows="2"
+        placeholder="type a message… (Enter sends, Shift+Enter newline)"
+        disabled
+      ></textarea>
+      <div class="composer-actions">
+        <button id="send-btn" disabled title="Send">→</button>
+        <button id="stop-btn" class="icon-btn" disabled title="Stop streaming">■</button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Settings dialog (M2) -->
+  <dialog id="settings-dialog" class="settings">
+    <form id="settings-form">
+      <h2>Settings</h2>
+
+      <label for="set-backend">Backend
+        <select id="set-backend" name="backend">
+          <option value="ollama">Ollama (local)</option>
+          <option value="vllm">vLLM (local, OpenAI-compatible)</option>
+          <option value="openrouter">OpenRouter</option>
+        </select>
+      </label>
+      <div id="openrouter-settings" hidden>
+        <label for="set-openrouter-key">OpenRouter API key
+          <input id="set-openrouter-key" name="openrouterApiKey" type="password" autocomplete="off" />
+        </label>
+        <p class="endpoint-note">Connects to <code>https://openrouter.ai/api/v1</code></p>
+        <p>Chats and tool results are sent to OpenRouter and the selected model provider. API usage may cost money.</p>
+      </div>
+      <div id="local-settings">
+      <label for="set-host">Host
+        <input id="set-host" name="host" placeholder="littlebrain or 127.0.0.1" autocomplete="off" />
+      </label>
+
+      <label for="set-port">Port
+        <input id="set-port" name="port" inputmode="numeric" placeholder="11434" autocomplete="off" />
+      </label>
+
+      <label for="set-apikey">API key (optional)
+        <input id="set-apikey" name="apiKey" type="password" autocomplete="off" />
+      </label>
+
+      </div>
+
+      <label for="set-system">System prompt (optional)
+        <textarea id="set-system" name="systemPrompt" rows="3" placeholder="You are Littlebrain…"></textarea>
+      </label>
+
+      <label for="set-pagelimit">Page-read limit (chars, 500–20000)
+        <input id="set-pagelimit" name="pageReadLimit" type="number" min="500" max="20000" step="100" value="6000" />
+      </label>
+
+      <label for="set-name">Assistant name (blank = Littlebrain)
+        <input id="set-name" name="assistantName" placeholder="Littlebrain" autocomplete="off" />
+      </label>
+
+      <p id="test-result" role="status"></p>
+
+      <div class="dialog-actions">
+        <button type="button" id="btn-test">Test connection</button>
+        <button type="submit" id="btn-save">Save</button>
+        <button type="button" id="btn-cancel">Cancel</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Model setup dialog (D-P3-16): the model-facing half of configuration.
+       Model selection (hot swap), temperature and tool permissions all apply
+       immediately on change — no Save button here, by design. -->
+  <dialog id="model-dialog" class="settings">
+    <h2>Model setup</h2>
+
+    <!-- The model-facing controls sit in their own section so they can keep
+         the stacked layout while .settings label renders row. -->
+    <section id="model-setup" aria-label="Model setup">
+      <p class="tool-perms-note">Changes here apply immediately and persist.</p>
+
+      <label for="model-picker">Model
+        <span class="model-row">
+          <select id="model-picker" disabled aria-label="Model">
+            <option value="">connect first…</option>
+          </select>
+          <button type="button" id="refresh-btn" class="icon-btn" title="Refresh model list" disabled>↻</button>
+        </span>
+      </label>
+
+      <label for="set-temp">Temperature (0–2)
+        <input id="set-temp" name="temperature" type="number" min="0" max="2" step="0.1" value="0.7" />
+      </label>
+
+      <section id="param-bag" aria-label="Sampling parameters">
+        <h3>Sampling parameters (per model)</h3>
+        <p class="tool-perms-note">Extra sampling params sent to the backend. Names are backend-specific (e.g. top_k, top_p, repetition_penalty). Unknown names are ignored by the server.</p>
+        <div id="param-rows"></div>
+        <button type="button" id="param-add">+ Add parameter</button>
+      </section>
+
+      <label for="set-ctxlimit">Context limit — tokens (optional, per model)
+        <input id="set-ctxlimit" name="contextLimit" type="number" min="1" step="1" placeholder="unknown" autocomplete="off" />
+      </label>
+
+      <label for="set-enforce" title="Send the context limit above to Ollama as num_ctx — it caps the TOTAL window, her reply included. Off by default; while off the number stays informational.">
+        <input id="set-enforce" type="checkbox" /> Enforce limit as Ollama num_ctx (caps total window incl. reply)
+      </label>
+
+      <label for="set-vision" title="Mark this model as able to see images, so the capture_screenshot tool can offer itself. Ollama reports this automatically; for vLLM you decide.">
+        <input id="set-vision" type="checkbox" /> Vision Model? (can see / take screenshots)
+      </label>
+
+      <label for="set-showthinking" title="Show the model's reasoning blocks above its answer. Per model — applies to every backend.">
+        <input id="set-showthinking" type="checkbox" checked /> Show model thinking
+      </label>
+
+      <label for="auto-compact" title="When ≤20% of a known context window would remain after a turn, the older messages are summarized automatically (last 10 kept verbatim). Manual compaction is unaffected.">
+        <input id="auto-compact" type="checkbox" checked /> Auto-compact near context limit
+      </label>
+
+      <label for="set-hoplimit" title="How many tool calls she may make in a single reply before being forced to answer. Applies to every model.">
+        Max tool calls per reply (1–99)
+        <input id="set-hoplimit" type="number" min="1" max="99" step="1" value="3" autocomplete="off" />
+      </label>
+    </section>
+
+    <section id="tool-perms" aria-label="Tool permissions">
+      <h3>Tool permissions</h3>
+      <p class="tool-perms-note">
+        Tools the model may use. Changes apply immediately and persist; tools it can't
+        see, it can't ask for.
+      </p>
+      <div id="tool-perms-list"></div>
+    </section>
+
+    <div class="dialog-actions">
+      <button type="button" id="btn-model-done">Done</button>
+    </div>
+  </dialog>
+
+  <script src="ollama.js"></script>
+  <script src="openrouter.js"></script>
+  <script src="sessions.js"></script>
+  <script src="tools.js"></script>
+  <script src="permissions.js"></script>
+  <script src="context.js"></script>
+  <script src="vllm.js"></script>
+  <script src="params.js"></script>
+  <script src="capabilities.js"></script>
+  <script src="display.js"></script>
+  <script src="sidepanel.js"></script>
+</body>
+</html>

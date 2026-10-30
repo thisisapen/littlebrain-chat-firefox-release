@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "Littlebrain Chat",
+  "version": "0.1.0",
+  "description": "Sidebar chat with local Ollama or vLLM, or cloud OpenRouter, including browser tools.",
+
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "littlebrain-chat@localhost",
+      "strict_min_version": "121.0"
+    }
+  },
+
+  "permissions": ["storage", "unlimitedStorage", "tabs", "search", "downloads"],
+
+  "host_permissions": ["<all_urls>"],
+
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
+
+  "sidebar_action": {
+    "default_title": "Littlebrain Chat",
+    "default_icon": "icons/icon.svg",
+    "default_panel": "sidepanel/index.html"
+  },
+
+  "commands": {
+    "_execute_sidebar_action": {
+      "suggested_key": { "default": "Ctrl+Alt+L" }
+    }
+  }
+}

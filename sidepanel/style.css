@@ -1,0 +1,472 @@
+/* Littlebrain Chat — side panel shell (M1) */
+
+:root {
+  --bg: #1e1f22;
+  --panel: #2b2d31;
+  --border: #3a3d42;
+  --text: #dcddde;
+  --muted: #9aa0a6;
+  --accent: #5b9bd5;
+  --ok: #7bc47f;
+  --warn: #d5a14a;
+  --err: #d56b6b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.45 system-ui, sans-serif;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* Top bar */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dot-ok { background: var(--ok); }
+.dot-connecting { background: var(--warn); }
+.dot-error { background: var(--err); }
+
+#session-picker {
+  flex: 1;
+  min-width: 64px;
+  max-width: 180px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 6px;
+}
+
+#model-picker {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 6px;
+}
+
+.icon-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  cursor: pointer;
+  padding: 3px 8px;
+}
+
+.icon-btn:hover:not(:disabled),
+#send-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Status text */
+.status-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Settings dialog */
+.settings {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  padding: 16px;
+  width: min(320px, 90vw);
+  max-height: 90vh; /* tool-permissions rows can make the dialog long (D-P3-15) */
+  overflow-y: auto;
+}
+
+.settings::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.settings form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings h2 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+
+.settings label {
+  display: flex;
+  // flex-direction: column;
+  flex-direction: row;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Settings fields: name pinned left, input pushed to the right edge
+ * (the paired look the row layout intends — .settings label alone only
+ * sets the direction, nothing separates the two halves). Scoped to the
+ * form so model-setup's stacked overrides stay untouched. */
+#settings-form label {
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Wide fields may claim the right half at most, else they crowd the name. */
+#settings-form input,
+#settings-form textarea {
+  max-width: 60%;
+}
+
+/* Model-setup controls keep the stacked layout (label above input) even
+ * though .settings label now renders row: the section opts out, and its
+ * own gap restores the spacing the old stacking carried. */
+#model-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#model-setup label {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+/* The auto-compact control keeps checkbox-beside-text even in the
+ * stacked section — it reads as one switch, not a labelled field. */
+#model-setup label[for="auto-compact"] {
+  flex-direction: row;
+  align-items: center;
+}
+
+.settings input,
+.settings textarea {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  font: inherit;
+  resize: vertical;
+}
+
+.settings select {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  font: inherit;
+}
+
+/* Context readout strip (P4-X3, D-P4-9). */
+.ctx-strip {
+  /* D-P4-9: full-width row ABOVE the prompt/submit row (parent wraps). */
+  flex-basis: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+  padding: 0 0 4px;
+  font-family: var(--mono, monospace);
+  font-size: 11px;
+  color: var(--muted, #888);
+  min-height: 1.2em;
+}
+
+.ctx-strip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ctx-usage.ctx-warn { color: #d9a441; }
+.ctx-usage.ctx-over { color: #d96041; }
+
+/* Model setup (D-P3-16): picker and its refresh button share one row. */
+.model-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.model-row select {
+  flex: 1;
+  min-width: 0;
+}
+
+#param-bag h3 {
+  margin: 12px 0 4px;
+  font-size: 0.9rem;
+}
+.param-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.param-row .param-key,
+.param-row .param-value {
+  flex: 1;
+  min-width: 0;
+  font-family: monospace;
+}
+.param-row .param-eq {
+  color: #888;
+}
+.param-row .param-remove {
+  flex: 0 0 auto;
+}
+
+#test-result {
+  min-height: 1em;
+  margin: 0;
+  font-size: 12px;
+}
+
+#test-result.ok { color: var(--ok); }
+#test-result.err { color: var(--err); }
+
+/* Tool permissions (D-P3-15): one generated row per registered tool. */
+#tool-perms {
+  border-top: 1px solid var(--border);
+  margin-top: 12px;
+  padding-top: 10px;
+}
+
+#tool-perms h3 {
+  margin: 0 0 2px;
+  font-size: 13px;
+}
+
+.tool-perms-note {
+  margin: 0 0 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.endpoint-note {
+  margin: 4px 0 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.endpoint-note code {
+  font-family: monospace;
+}
+
+.tool-perm {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 0;
+  cursor: pointer;
+}
+
+.tool-perm input[type="checkbox"] {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin: 2px 0 0;
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+.tool-perm span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.tool-perm-head strong {
+  font-family: ui-monospace, monospace;
+  font-weight: 600;
+}
+
+.tool-perm small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.dialog-actions button {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.dialog-actions button:hover {
+  border-color: var(--accent);
+}
+
+.dialog-actions #btn-save {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* Messages */
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.msg {
+  max-width: 92%;
+  padding: 6px 10px;
+  border-radius: 8px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.msg .who {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+
+.msg.user {
+  align-self: flex-end;
+  background: #2e4a6b;
+}
+
+.msg.assistant {
+  align-self: flex-start;
+  background: var(--panel);
+}
+
+.msg.system-msg {
+  align-self: center;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* D-P4-11: the model's reasoning line (live + re-rendered). A left-aligned,
+ * full-width variant of the centred system lines. */
+.msg.think-line {
+  align-self: stretch;
+  text-align: left;
+  font-size: 11px;
+  font-style: italic;
+  opacity: 0.85;
+  border-left: 2px solid var(--border);
+  padding-left: 8px;
+}
+
+/* Compaction record (D-P4-8): a permanent, unmistakable entry — distinct
+ * from the centred scan lines; hover reveals the full summary notes. */
+.msg.compact-msg {
+  align-self: stretch;
+  margin: 6px 2px 2px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 12px;
+  text-align: left;
+  cursor: help;
+}
+
+/* D-P4-10: the warning under a page-mutating tool in Tool permissions. */
+.perm-warn {
+  display: block;
+  color: var(--warn);
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.msg.error {
+  color: var(--err);
+}
+
+/* Composer */
+.composer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+}
+
+#input {
+  flex: 1;
+  resize: none;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  font: inherit;
+}
+
+.composer-actions {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+#send-btn {
+  background: var(--accent);
+  border: none;
+  border-radius: 4px;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 10px;
+}
